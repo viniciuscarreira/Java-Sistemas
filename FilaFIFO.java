@@ -1,3 +1,4 @@
+
 import java.util.LinkedList; // Importa a classe LinkedList
 import java.util.Queue; // Importa a interface Queue
 import java.util.Scanner; // Importa a classe Scanner
@@ -76,9 +77,8 @@ public class FilaFIFO {
     private DateTimeFormatter timeFormatter; // Formato do tempo
     private int proximoId; // Próximo ID de cliente
     private Random random; // Gerador de números aleatórios
-    private final int TEMPO_MAXIMO_CHEGADA = 5; // Tempo máximo de chegada entre clientes (em minutos)
-    private final int TEMPO_MINIMO_ATENDIMENTO = 10; // Tempo mínimo de atendimento no caixa (em minutos)
-    private final int TEMPO_MAXIMO_ATENDIMENTO = 45; // Tempo máximo de atendimento no caixa (em minutos)
+    private double LAMBDA_CHEGADA; // Taxa média de chegada (clientes por minuto)
+    private final double LAMBDA_ATENDIMENTO = 0.05; // Taxa média de atendimento (clientes por minuto)
 
     public FilaFIFO() {
         this.fila = new LinkedList<>();
@@ -96,6 +96,10 @@ public class FilaFIFO {
         this.random = new Random(); // Inicializa o gerador de números aleatórios
     }
 
+    public void setTaxaChegada(double tempoMedioChegada) {
+        this.LAMBDA_CHEGADA = 1.0 / tempoMedioChegada; // Calcula a taxa lambda para a distribuição exponencial
+    }
+
     public void adicionarClientes() {
         Scanner scanner = new Scanner(System.in); // Scanner para entrada de dados do usuário
         System.out.print("Digite o número de clientes a adicionar: ");
@@ -110,9 +114,9 @@ public class FilaFIFO {
             listaEventos.add(new Evento("chegada", tempoChegada)); // Adiciona um evento de chegada à lista de eventos
             System.out.println("Adicionado: " + cliente);
 
-            // Gera um tempo de chegada para o próximo cliente
-            int tempoEsperaAleatorio = 1 + random.nextInt(TEMPO_MAXIMO_CHEGADA); // Gera um tempo aleatório entre 1 e TEMPO_MAXIMO_CHEGADA
-            tempoChegada = tempoChegada.plusMinutes(tempoEsperaAleatorio); // Incrementa o tempo de chegada
+            // Gera um tempo de chegada exponencial para o próximo cliente
+            double tempoEsperaExponencial = -Math.log(1 - random.nextDouble()) / LAMBDA_CHEGADA; // Gera um tempo exponencial
+            tempoChegada = tempoChegada.plusMinutes((long) tempoEsperaExponencial); // Incrementa o tempo de chegada
         }
     }
 
@@ -121,8 +125,8 @@ public class FilaFIFO {
             // Atende clientes no caixa atual
             while (!caixaAtual.isEmpty()) {
                 Cliente cliente = caixaAtual.poll(); // Remove o cliente da fila do caixa atual
-                int tempoAtendimentoAleatorio = TEMPO_MINIMO_ATENDIMENTO + random.nextInt(TEMPO_MAXIMO_ATENDIMENTO - TEMPO_MINIMO_ATENDIMENTO + 1); // Gera um tempo de atendimento aleatório
-                cliente.setTempoSaida(tempoAtual.plusMinutes(tempoAtendimentoAleatorio)); // Define a hora de saída do cliente
+                double tempoAtendimentoExponencial = -Math.log(1 - random.nextDouble()) / LAMBDA_ATENDIMENTO; // Gera um tempo de atendimento exponencial
+                cliente.setTempoSaida(tempoAtual.plusMinutes((long) tempoAtendimentoExponencial)); // Define a hora de saída do cliente
 
                 // Calcula o tempo de espera do cliente e acumula
                 Duration tempoEspera = Duration.between(cliente.getTempoAtendimento(), cliente.getTempoSaida()); // Calcula o tempo de espera
@@ -137,7 +141,7 @@ public class FilaFIFO {
                 System.out.println("Hora de chegada: " + cliente.getTempoChegada().format(timeFormatter));
                 System.out.println("Início do atendimento: " + cliente.getTempoAtendimento().format(timeFormatter));
                 System.out.println("Hora de saída: " + cliente.getTempoSaida().format(timeFormatter));
-                System.out.println("Tempo de atendimento: " + tempoAtendimentoAleatorio + " minutos");
+                System.out.println("Tempo de atendimento: " + (long) tempoAtendimentoExponencial + " minutos");
                 System.out.println("Tempo de espera: " + tempoEspera.toHours() + ":" + String.format("%02d", tempoEspera.toMinutes() % 60));
                 System.out.println("=========================================");
             }
@@ -164,10 +168,7 @@ public class FilaFIFO {
             caixaAtual = proximoCaixa;
             proximoCaixa = temp;
 
-            // Avança o tempo apenas se houver clientes na fila principal ou nos caixas
-            if (!fila.isEmpty() || !caixaAtual.isEmpty()) {
-                passarTempo(1);
-            }
+            // Avança o tempo apenas se
         }
         System.out.println("Todos os clientes foram atendidos.");
     }
@@ -176,7 +177,7 @@ public class FilaFIFO {
         // Verifica se há algum cliente na fila esperando há mais de 30 minutos
         for (Cliente cliente : fila) {
             Duration tempoEspera = Duration.between(cliente.getTempoChegada(), tempoAtual);
-            if (tempoEspera.toMinutes() >= TEMPO_MAXIMO_ATENDIMENTO) {
+            if (tempoEspera.toMinutes() >= 30) {
                 // Move o cliente para o próximo caixa
                 proximoCaixa.add(cliente);
                 System.out.println("Cliente " + cliente.getId() + " foi encaminhado para um novo caixa devido ao tempo de espera.");
@@ -205,6 +206,10 @@ public class FilaFIFO {
         FilaFIFO filaFIFO = new FilaFIFO();
         Scanner scanner = new Scanner(System.in); // Scanner para entrada de dados do usuário
         boolean continuar = true;
+
+        System.out.print("Digite o tempo médio de chegada (em minutos): ");
+        double tempoMedioChegada = scanner.nextDouble();
+        filaFIFO.setTaxaChegada(tempoMedioChegada);
 
         while (continuar) {
             System.out.println("\n1. Adicionar Clientes");
@@ -236,3 +241,19 @@ public class FilaFIFO {
         scanner.close();
     }
 }
+
+
+// Verificar os valores expondenciais (fórmula inversa da distribuição exponencial)
+
+// Simulaçao (excel, sistema)
+
+// valores aleatorios expondenciais entre 0 e 1
+
+// input multiplicar pelo valor gerado ACIMA
+
+// tempo limite (480 min) ou (8horas)
+
+//gerar cliente 1 por vez
+
+// quando chegar o tempo limite (horas), colocar automatico pro outro cliente nao ser gerado
+
